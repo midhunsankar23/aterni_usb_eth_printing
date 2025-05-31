@@ -65,6 +65,34 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  Future<void> _printCustomData() async {
+    try {
+      // Example 1: Print simple text
+      var textBytes = Uint8List.fromList(utf8.encode('Hello World\n'));
+      await _printer.write(textBytes);
+
+      // Example 2: Print with formatting commands (ESC/POS commands)
+      // Initialize printer
+      List<int> bytes = [];
+      // Center align
+      bytes.addAll([0x1B, 0x61, 0x01]);
+      // Bold text
+      bytes.addAll([0x1B, 0x45, 0x01]);
+      bytes.addAll(utf8.encode('Bold Centered Text\n'));
+      // Cancel bold
+      bytes.addAll([0x1B, 0x45, 0x00]);
+      // Left align
+      bytes.addAll([0x1B, 0x61, 0x00]);
+      bytes.addAll(utf8.encode('Normal Left Text\n'));
+      // Feed and cut
+      bytes.addAll([0x1D, 0x56, 0x41, 0x03]);
+
+      await _printer.write(Uint8List.fromList(bytes));
+    } on PlatformException catch (e) {
+      print("Error printing: ${e.message}");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -76,8 +104,13 @@ class _MyAppState extends State<MyApp> {
               icon: const Icon(Icons.refresh),
               onPressed: _getDevicelist,
             ),
-            if (connected)
+            if (connected) ...[
               IconButton(icon: const Icon(Icons.print), onPressed: _print),
+              IconButton(
+                icon: const Icon(Icons.print_outlined),
+                onPressed: _printCustomData,
+              ),
+            ],
           ],
         ),
         body:
