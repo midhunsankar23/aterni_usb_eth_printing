@@ -11,6 +11,9 @@ dependencies:
   flutter:
     sdk: flutter
   plugin_platform_interface: ^2.0.2
+  esc_pos_utils_plus:
+    git:
+      url: https://github.com/midhunsankar23/esc_pos_utils_plus.git
 
 dev_dependencies:
   flutter_test:

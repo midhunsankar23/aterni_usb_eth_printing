@@ -22,7 +22,6 @@ class USBPrinterAdapter {
 
     private var mInstance: USBPrinterAdapter? = null
 
-
     private val LOG_TAG = "Flutter USB Printer"
     private var mContext: Context? = null
     private var mUSBManager: UsbManager? = null
@@ -34,8 +33,11 @@ class USBPrinterAdapter {
 
     private val ACTION_USB_PERMISSION = "com.aterni.aterni_usb_eth_printing.USB_PERMISSION"
 
-
-
+    // Chunking configuration
+    private val DEFAULT_CHUNK_SIZE = 8192 // 8KB chunks
+    private val MAX_RETRIES = 3
+    private val CHUNK_TIMEOUT = 5000 // 5 seconds per chunk
+    private val INTER_CHUNK_DELAY = 10L // 10ms between chunks
 
     fun getInstance(): USBPrinterAdapter? {
         if (mInstance == null) {
@@ -93,8 +95,6 @@ class USBPrinterAdapter {
                 0
             )
         }
-//        mPermissionIndent =
-//            PendingIntent.getBroadcast(mContext, 0, Intent(ACTION_USB_PERMISSION), 0)
         val filter = IntentFilter(ACTION_USB_PERMISSION)
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -102,10 +102,8 @@ class USBPrinterAdapter {
         } else {
             mContext!!.registerReceiver(mUsbDeviceReceiver, filter)
         }
-        //mContext!!.registerReceiver(mUsbDeviceReceiver, filter)
         Log.v(LOG_TAG, "USB Printer initialized")
     }
-
 
     fun closeConnectionIfExists() {
         if (mUsbDeviceConnection != null) {
@@ -152,7 +150,7 @@ class USBPrinterAdapter {
 
     private fun openConnection(): Boolean {
         if (mUsbDevice == null) {
-            Log.e(LOG_TAG, "USB Deivce is not initialized")
+            Log.e(LOG_TAG, "USB Device is not initialized")
             return false
         }
         if (mUSBManager == null) {
@@ -163,6 +161,7 @@ class USBPrinterAdapter {
             Log.i(LOG_TAG, "USB Connection already connected")
             return true
         }
+        
         val usbInterface = mUsbDevice!!.getInterface(0)
         for (i in 0 until usbInterface.endpointCount) {
             val ep = usbInterface.getEndpoint(i)
@@ -187,9 +186,90 @@ class USBPrinterAdapter {
                 }
             }
         }
+        return false
+    }
+
+    /**
+     * Enhanced chunked transfer method with retry mechanism
+     */
+    private fun transferWithChunking(bytes: ByteArray, chunkSize: Int = DEFAULT_CHUNK_SIZE): Boolean {
+        val totalSize = bytes.size
+        var offset = 0
+        var transferredBytes = 0
+        
+        Log.i(LOG_TAG, "Starting chunked transfer: $totalSize bytes, chunk size: $chunkSize")
+        
+        while (offset < totalSize) {
+            val remainingBytes = totalSize - offset
+            val currentChunkSize = minOf(chunkSize, remainingBytes)
+            
+            // Create chunk from the original array
+            val chunk = bytes.sliceArray(offset until offset + currentChunkSize)
+            
+            // Transfer with retry mechanism
+            val result = transferChunkWithRetry(chunk, MAX_RETRIES)
+            
+            if (result < 0) {
+                Log.e(LOG_TAG, "Failed to transfer chunk at offset $offset (size: $currentChunkSize)")
+                return false
+            }
+            
+            transferredBytes += result
+            offset += currentChunkSize
+            
+            // Log progress for large transfers
+            if (totalSize > 10000) {
+                val progress = (transferredBytes * 100) / totalSize
+                Log.i(LOG_TAG, "Transfer progress: $progress% ($transferredBytes/$totalSize bytes)")
+            }
+            
+            // Small delay between chunks to prevent overwhelming the printer
+            if (offset < totalSize) {
+                Thread.sleep(INTER_CHUNK_DELAY)
+            }
+        }
+        
+        Log.i(LOG_TAG, "Transfer completed successfully: $transferredBytes bytes")
         return true
     }
 
+    /**
+     * Transfer a single chunk with retry mechanism
+     */
+    private fun transferChunkWithRetry(chunk: ByteArray, maxRetries: Int): Int {
+        var attempts = 0
+        
+        while (attempts < maxRetries) {
+            if (attempts > 0) {
+                Log.w(LOG_TAG, "Retrying chunk transfer, attempt ${attempts + 1}")
+                Thread.sleep(100) // Wait before retry
+            }
+            
+            val result = mUsbDeviceConnection!!.bulkTransfer(
+                mEndPoint, 
+                chunk, 
+                chunk.size, 
+                CHUNK_TIMEOUT
+            )
+            
+            if (result >= 0) {
+                if (attempts > 0) {
+                    Log.i(LOG_TAG, "Chunk transfer succeeded on retry $attempts")
+                }
+                return result
+            }
+            
+            Log.w(LOG_TAG, "Chunk transfer failed, result: $result")
+            attempts++
+        }
+        
+        Log.e(LOG_TAG, "Chunk transfer failed after $maxRetries attempts")
+        return -1
+    }
+
+    /**
+     * Enhanced printText method with chunking
+     */
     fun printText(text: String): Boolean {
         Log.v(LOG_TAG, "start to print text")
         val isConnected = openConnection()
@@ -197,8 +277,9 @@ class USBPrinterAdapter {
             Log.v(LOG_TAG, "Connected to device")
             Thread {
                 val bytes = text.toByteArray(Charset.forName("UTF-8"))
-                val b = mUsbDeviceConnection!!.bulkTransfer(mEndPoint, bytes, bytes.size, 100000)
-                Log.i(LOG_TAG, "Return Status: b-->$b")
+                Log.i(LOG_TAG, "Converting text to ${bytes.size} bytes")
+                val success = transferWithChunking(bytes)
+                Log.i(LOG_TAG, "Text transfer result: $success")
             }.start()
             true
         } else {
@@ -207,15 +288,19 @@ class USBPrinterAdapter {
         }
     }
 
+    /**
+     * Enhanced printRawText method with chunking
+     */
     fun printRawText(data: String): Boolean {
-        Log.v(LOG_TAG, "start to print raw data $data")
+        Log.v(LOG_TAG, "start to print raw data")
         val isConnected = openConnection()
         return if (isConnected) {
             Log.v(LOG_TAG, "Connected to device")
             Thread {
                 val bytes = Base64.decode(data, Base64.DEFAULT)
-                val b = mUsbDeviceConnection!!.bulkTransfer(mEndPoint, bytes, bytes.size, 100000)
-                Log.i(LOG_TAG, "Return Status: $b")
+                Log.i(LOG_TAG, "Decoded ${bytes.size} bytes from base64")
+                val success = transferWithChunking(bytes)
+                Log.i(LOG_TAG, "Raw data transfer result: $success")
             }.start()
             true
         } else {
@@ -224,14 +309,36 @@ class USBPrinterAdapter {
         }
     }
 
+    /**
+     * Enhanced write method with chunking
+     */
     fun write(bytes: ByteArray): Boolean {
-        Log.v(LOG_TAG, "start to print raw data $bytes")
+        Log.v(LOG_TAG, "start to print raw data, size: ${bytes.size} bytes")
         val isConnected = openConnection()
         return if (isConnected) {
             Log.v(LOG_TAG, "Connected to device")
             Thread {
-                val b = mUsbDeviceConnection!!.bulkTransfer(mEndPoint, bytes, bytes.size, 100000)
-                Log.i(LOG_TAG, "Return Status: $b")
+                val success = transferWithChunking(bytes)
+                Log.i(LOG_TAG, "Write transfer result: $success")
+            }.start()
+            true
+        } else {
+            Log.v(LOG_TAG, "failed to connected to device")
+            false
+        }
+    }
+
+    /**
+     * Optional: Method to configure chunk size for specific printers
+     */
+    fun writeWithCustomChunkSize(bytes: ByteArray, chunkSize: Int): Boolean {
+        Log.v(LOG_TAG, "start to print raw data with custom chunk size: $chunkSize")
+        val isConnected = openConnection()
+        return if (isConnected) {
+            Log.v(LOG_TAG, "Connected to device")
+            Thread {
+                val success = transferWithChunking(bytes, chunkSize)
+                Log.i(LOG_TAG, "Custom chunk transfer result: $success")
             }.start()
             true
         } else {
