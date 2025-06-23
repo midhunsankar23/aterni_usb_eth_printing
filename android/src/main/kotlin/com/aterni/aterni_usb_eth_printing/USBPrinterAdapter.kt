@@ -49,29 +49,92 @@ class USBPrinterAdapter {
     private val mUsbDeviceReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val action = intent.action
-            if (ACTION_USB_PERMISSION == action) {
-                synchronized(this) {
-                    val usbDevice =
-                        intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
-                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                        Log.i(
-                            LOG_TAG,
-                            "Success to grant permission for device " + usbDevice!!.deviceId + ", vendor_id: " + usbDevice.vendorId + " product_id: " + usbDevice.productId
-                        )
-                        mUsbDevice = usbDevice
-                    } else {
-                        Toast.makeText(
-                            context,
-                            "User refused to give USB device permissions" + usbDevice!!.deviceName,
-                            Toast.LENGTH_LONG
-                        ).show()
+            Log.d(LOG_TAG, "BroadcastReceiver received action: $action")
+            
+            when (action) {
+                ACTION_USB_PERMISSION -> {
+                    synchronized(this) {
+                        val usbDevice = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) as UsbDevice?
+                        }
+                        
+                        if (usbDevice == null) {
+                            Log.e(LOG_TAG, "USB device is null in permission response")
+                            return
+                        }
+                        
+                        val permissionGranted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                        
+                        if (permissionGranted) {
+                            Log.i(
+                                LOG_TAG,
+                                "Permission granted for device ${usbDevice.deviceId}, vendor_id: ${usbDevice.vendorId}, product_id: ${usbDevice.productId}"
+                            )
+                            mUsbDevice = usbDevice
+                            
+                            // Now that we have permission, try to open the connection
+                            if (openConnection()) {
+                                Toast.makeText(
+                                    context,
+                                    "Printer connected successfully",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Failed to connect to printer",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        } else {
+                            Log.e(
+                                LOG_TAG,
+                                "User refused USB device permission for ${usbDevice.deviceName}"
+                            )
+                            Toast.makeText(
+                                context,
+                                "Permission denied for USB device: ${usbDevice.deviceName}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 }
-            } else if (UsbManager.ACTION_USB_DEVICE_DETACHED == action) {
-                if (mUsbDevice != null) {
-                    Toast.makeText(context, "USB device has been turned off", Toast.LENGTH_LONG)
-                        .show()
-                    closeConnectionIfExists()
+                
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                    val usbDevice = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) as UsbDevice?
+                    }
+                    
+                    if (usbDevice != null) {
+                        Log.i(LOG_TAG, "USB device attached: ${usbDevice.deviceName}")
+                        // If this is the device we're looking for, request permission
+                        if (mUsbDevice != null && mUsbDevice!!.deviceId == usbDevice.deviceId) {
+                            if (!mUSBManager!!.hasPermission(usbDevice)) {
+                                mUSBManager!!.requestPermission(usbDevice, mPermissionIndent)
+                            }
+                        }
+                    }
+                }
+                
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                    val usbDevice = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) as UsbDevice?
+                    }
+                    
+                    if (mUsbDevice != null && usbDevice != null && mUsbDevice!!.deviceId == usbDevice.deviceId) {
+                        Log.i(LOG_TAG, "Connected USB device detached: ${usbDevice.deviceName}")
+                        Toast.makeText(context, "Printer disconnected", Toast.LENGTH_LONG).show()
+                        closeConnectionIfExists()
+                    }
                 }
             }
         }
@@ -80,29 +143,42 @@ class USBPrinterAdapter {
     fun init(reactContext: Context?) {
         mContext = reactContext
         mUSBManager = mContext!!.getSystemService(Context.USB_SERVICE) as UsbManager
+        
+        // Create a more explicit intent for USB permission
+        val permissionIntent = Intent(ACTION_USB_PERMISSION)
+        // Add package name to make intent explicit
+        permissionIntent.setPackage(mContext!!.packageName)
+        
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             mPermissionIndent = PendingIntent.getBroadcast(
                 mContext!!,
                 0,
-                Intent(ACTION_USB_PERMISSION),
+                permissionIntent,
                 PendingIntent.FLAG_IMMUTABLE
             )
         } else {
             mPermissionIndent = PendingIntent.getBroadcast(
                 mContext!!,
                 0,
-                Intent(ACTION_USB_PERMISSION),
+                permissionIntent,
                 0
             )
         }
+        
         val filter = IntentFilter(ACTION_USB_PERMISSION)
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            mContext!!.registerReceiver(mUsbDeviceReceiver, filter, 0x4)
-        } else {
-            mContext!!.registerReceiver(mUsbDeviceReceiver, filter)
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+        
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                mContext!!.registerReceiver(mUsbDeviceReceiver, filter, 0x4)
+            } else {
+                mContext!!.registerReceiver(mUsbDeviceReceiver, filter)
+            }
+            Log.v(LOG_TAG, "USB Printer initialized and broadcast receiver registered")
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Error registering USB broadcast receiver: ${e.message}", e)
         }
-        Log.v(LOG_TAG, "USB Printer initialized")
     }
 
     fun closeConnectionIfExists() {
@@ -131,20 +207,50 @@ class USBPrinterAdapter {
         if (mUsbDevice == null || mUsbDevice!!.vendorId != vendorId || mUsbDevice!!.productId != productId) {
             closeConnectionIfExists()
             val usbDevices = getDeviceList()
+            
+            // Check if we have any USB devices detected
+            if (usbDevices.isEmpty()) {
+                Log.e(LOG_TAG, "No USB devices found")
+                return false
+            }
+            
+            // Find the requested device
             for (usbDevice in usbDevices) {
                 if (usbDevice.vendorId == vendorId && usbDevice.productId == productId) {
-                    Log.v(
+                    Log.i(
                         LOG_TAG,
-                        "Request for device: vendor_id: " + usbDevice.vendorId + ", product_id: " + usbDevice.productId
+                        "Found device: vendor_id: ${usbDevice.vendorId}, product_id: ${usbDevice.productId}"
                     )
+                    
                     closeConnectionIfExists()
-                    mUSBManager!!.requestPermission(usbDevice, mPermissionIndent)
-                    mUsbDevice = usbDevice
-                    return true
+                    
+                    // Check if we already have permission
+                    if (mUSBManager!!.hasPermission(usbDevice)) {
+                        Log.i(LOG_TAG, "Already have permission for this device")
+                        mUsbDevice = usbDevice
+                        return true
+                    } else {
+                        // Request permission
+                        Log.i(LOG_TAG, "Requesting permission for device")
+                        try {
+                            mUSBManager!!.requestPermission(usbDevice, mPermissionIndent)
+                            // Store the device reference - we'll confirm permission in the broadcast receiver
+                            mUsbDevice = usbDevice
+                            return true
+                        } catch (e: Exception) {
+                            Log.e(LOG_TAG, "Error requesting permission: ${e.message}", e)
+                            return false
+                        }
+                    }
                 }
             }
+            
+            Log.e(LOG_TAG, "Device with vendorId $vendorId and productId $productId not found")
             return false
         }
+        
+        // We already have the device selected
+        Log.i(LOG_TAG, "Device already selected")
         return true
     }
 
@@ -162,31 +268,64 @@ class USBPrinterAdapter {
             return true
         }
         
-        val usbInterface = mUsbDevice!!.getInterface(0)
-        for (i in 0 until usbInterface.endpointCount) {
-            val ep = usbInterface.getEndpoint(i)
-            if (ep.type == UsbConstants.USB_ENDPOINT_XFER_BULK) {
-                if (ep.direction == UsbConstants.USB_DIR_OUT) {
-                    val usbDeviceConnection = mUSBManager!!.openDevice(mUsbDevice)
-                    if (usbDeviceConnection == null) {
-                        Log.e(LOG_TAG, "failed to open USB Connection")
-                        return false
-                    }
-                    Toast.makeText(mContext, "Device connected", Toast.LENGTH_SHORT).show()
-                    return if (usbDeviceConnection.claimInterface(usbInterface, true)) {
-                        mEndPoint = ep
-                        mUsbInterface = usbInterface
-                        mUsbDeviceConnection = usbDeviceConnection
-                        true
-                    } else {
-                        usbDeviceConnection.close()
-                        Log.e(LOG_TAG, "failed to claim usb connection")
-                        false
+        // Check if we have permission for this device
+        if (!mUSBManager!!.hasPermission(mUsbDevice)) {
+            Log.e(LOG_TAG, "No permission to access USB device. Requesting permission...")
+            try {
+                mUSBManager!!.requestPermission(mUsbDevice, mPermissionIndent)
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Error requesting permission: ${e.message}", e)
+            }
+            return false
+        }
+        
+        try {
+            val usbInterface = mUsbDevice!!.getInterface(0)
+            for (i in 0 until usbInterface.endpointCount) {
+                val ep = usbInterface.getEndpoint(i)
+                if (ep.type == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                    if (ep.direction == UsbConstants.USB_DIR_OUT) {
+                        try {
+                            val usbDeviceConnection = mUSBManager!!.openDevice(mUsbDevice)
+                            if (usbDeviceConnection == null) {
+                                Log.e(LOG_TAG, "Failed to open USB Connection - connection null")
+                                return false
+                            }
+                            
+                            try {
+                                if (usbDeviceConnection.claimInterface(usbInterface, true)) {
+                                    mEndPoint = ep
+                                    mUsbInterface = usbInterface
+                                    mUsbDeviceConnection = usbDeviceConnection
+                                    Log.i(LOG_TAG, "Successfully claimed USB interface")
+                                    Toast.makeText(mContext, "Printer connected successfully", Toast.LENGTH_SHORT).show()
+                                    return true
+                                } else {
+                                    usbDeviceConnection.close()
+                                    Log.e(LOG_TAG, "Failed to claim USB interface")
+                                    Toast.makeText(mContext, "Failed to connect to printer", Toast.LENGTH_SHORT).show()
+                                    return false
+                                }
+                            } catch (e: Exception) {
+                                Log.e(LOG_TAG, "Error claiming interface: ${e.message}", e)
+                                usbDeviceConnection.close()
+                                return false
+                            }
+                        } catch (e: Exception) {
+                            Log.e(LOG_TAG, "Error opening device: ${e.message}", e)
+                            return false
+                        }
                     }
                 }
             }
+            
+            Log.e(LOG_TAG, "No suitable USB endpoint found")
+            return false
+            
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Error in openConnection: ${e.message}", e)
+            return false
         }
-        return false
     }
 
     /**

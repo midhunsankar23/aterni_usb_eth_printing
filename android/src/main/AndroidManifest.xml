@@ -1,4 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-feature android:name="android.hardware.usb.host" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="true" />
     <uses-permission android:name="android.permission.USB_PERMISSION" />
+    <uses-permission android:name="android.hardware.usb.accessory" />
+    
+    <application>
+        <!-- Receiver for USB permission -->
+        <receiver 
+            android:name=".UsbPermissionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.aterni.aterni_usb_eth_printing.USB_PERMISSION" />
+            </intent-filter>
+        </receiver>
+    </application>
 </manifest>
