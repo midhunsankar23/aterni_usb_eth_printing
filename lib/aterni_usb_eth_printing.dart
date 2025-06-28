@@ -5,6 +5,42 @@ import 'aterni_usb_eth_printing_platform_interface.dart';
 export 'network_printer/network_printer.dart';
 export 'network_printer/enums.dart';
 
+// Export essential esc_pos_utils_plus classes and enums that users will need
+export 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart'
+    show
+        // Core classes
+        CapabilityProfile,
+        Generator,
+
+        // Paper sizes
+        PaperSize,
+
+        // Text styling
+        PosStyles,
+        PosAlign,
+        PosTextSize,
+        PosFontType,
+
+        // Table/Row formatting
+        PosColumn,
+
+        // Barcode support
+        Barcode,
+        BarcodeFont,
+        BarcodeText,
+
+        // QR Code support
+        QRSize,
+        QRCorrection,
+
+        // Image support
+        PosImageFn,
+
+        // Hardware controls
+        PosCutMode,
+        PosDrawer,
+        PosBeepDuration;
+
 class AterniUsbEthPrinting {
   Future<String?> getPlatformVersion() {
     return AterniUsbEthPrintingPlatform.instance.getPlatformVersion();

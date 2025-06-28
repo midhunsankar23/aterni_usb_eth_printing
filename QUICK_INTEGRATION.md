@@ -21,7 +21,11 @@ dependencies:
 
 ```dart
 import 'package:aterni_usb_eth_printing/aterni_usb_eth_printing.dart';
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+// All necessary enums and classes are now exported from the main package:
+// - NetworkPrinter, PosPrintResult
+// - PaperSize, CapabilityProfile
+// - PosStyles, PosAlign, PosTextSize
+// - PosColumn, QRSize, BarcodeText, etc.
 ```
 
 ## Step 3: Basic Setup

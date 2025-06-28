@@ -62,7 +62,7 @@ await printer.write(data);
 
 ```dart
 import 'package:aterni_usb_eth_printing/aterni_usb_eth_printing.dart';
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+// All classes including PaperSize, CapabilityProfile, PosStyles are exported
 
 // Create network printer instance
 final profile = await CapabilityProfile.load();
@@ -90,6 +90,8 @@ printer.disconnect();
 
 - **[USB Printing Usage Guide](USAGE.md)** - Complete guide for USB printing
 - **[Network Printing Usage Guide](NETWORK_PRINTER_USAGE.md)** - Complete guide for network printing
+- **[Quick Integration Guide](QUICK_INTEGRATION.md)** - Step-by-step integration
+- **[Enum and Class Reference](ENUM_REFERENCE.md)** - Complete reference for all available enums and classes
 - **[Example Projects](example/)** - Working examples for both USB and network printing
 
 For more examples and usage details, see the [example](example) project.

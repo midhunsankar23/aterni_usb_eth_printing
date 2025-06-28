@@ -17,7 +17,8 @@ dependencies:
 
 ```dart
 import 'package:aterni_usb_eth_printing/aterni_usb_eth_printing.dart';
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+// All necessary classes and enums are exported from the main package
+// No need to import esc_pos_utils_plus separately
 ```
 
 ## Basic Usage
@@ -210,7 +211,7 @@ void disconnectPrinter() {
 ```dart
 import 'package:flutter/material.dart';
 import 'package:aterni_usb_eth_printing/aterni_usb_eth_printing.dart';
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+// All classes including PaperSize, CapabilityProfile, PosStyles, etc. are available
 
 class NetworkPrinterExample extends StatefulWidget {
   @override

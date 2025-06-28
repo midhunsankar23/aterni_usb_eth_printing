@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:aterni_usb_eth_printing/aterni_usb_eth_printing.dart';
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+// Note: All esc_pos_utils_plus classes are now exported from the main package
 
 /// Simple example showing how to use the network printer functionality
 /// from the aterni_usb_eth_printing plugin.
@@ -8,15 +8,19 @@ class SimpleNetworkPrinterExample extends StatefulWidget {
   const SimpleNetworkPrinterExample({Key? key}) : super(key: key);
 
   @override
-  _SimpleNetworkPrinterExampleState createState() => _SimpleNetworkPrinterExampleState();
+  _SimpleNetworkPrinterExampleState createState() =>
+      _SimpleNetworkPrinterExampleState();
 }
 
-class _SimpleNetworkPrinterExampleState extends State<SimpleNetworkPrinterExample> {
+class _SimpleNetworkPrinterExampleState
+    extends State<SimpleNetworkPrinterExample> {
   late NetworkPrinter printer;
   bool isConnected = false;
   String statusMessage = 'Not connected';
-  final TextEditingController _ipController = TextEditingController(text: '192.168.1.100');
-  final TextEditingController _portController = TextEditingController(text: '9100');
+  final TextEditingController _ipController =
+      TextEditingController(text: '192.168.1.100');
+  final TextEditingController _portController =
+      TextEditingController(text: '9100');
 
   @override
   void initState() {
@@ -96,22 +100,40 @@ class _SimpleNetworkPrinterExampleState extends State<SimpleNetworkPrinterExampl
       // Sample items
       printer.row([
         PosColumn(text: 'Item', width: 6),
-        PosColumn(text: 'Qty', width: 3, styles: const PosStyles(align: PosAlign.center)),
-        PosColumn(text: 'Price', width: 3, styles: const PosStyles(align: PosAlign.right)),
+        PosColumn(
+            text: 'Qty',
+            width: 3,
+            styles: const PosStyles(align: PosAlign.center)),
+        PosColumn(
+            text: 'Price',
+            width: 3,
+            styles: const PosStyles(align: PosAlign.right)),
       ]);
 
       printer.hr();
 
       printer.row([
         PosColumn(text: 'Coffee', width: 6),
-        PosColumn(text: '2', width: 3, styles: const PosStyles(align: PosAlign.center)),
-        PosColumn(text: '\$6.00', width: 3, styles: const PosStyles(align: PosAlign.right)),
+        PosColumn(
+            text: '2',
+            width: 3,
+            styles: const PosStyles(align: PosAlign.center)),
+        PosColumn(
+            text: '\$6.00',
+            width: 3,
+            styles: const PosStyles(align: PosAlign.right)),
       ]);
 
       printer.row([
         PosColumn(text: 'Tea', width: 6),
-        PosColumn(text: '1', width: 3, styles: const PosStyles(align: PosAlign.center)),
-        PosColumn(text: '\$3.00', width: 3, styles: const PosStyles(align: PosAlign.right)),
+        PosColumn(
+            text: '1',
+            width: 3,
+            styles: const PosStyles(align: PosAlign.center)),
+        PosColumn(
+            text: '\$3.00',
+            width: 3,
+            styles: const PosStyles(align: PosAlign.right)),
       ]);
 
       printer.hr();
@@ -119,7 +141,10 @@ class _SimpleNetworkPrinterExampleState extends State<SimpleNetworkPrinterExampl
       // Total
       printer.row([
         PosColumn(text: 'TOTAL', width: 9, styles: const PosStyles(bold: true)),
-        PosColumn(text: '\$9.00', width: 3, styles: const PosStyles(bold: true, align: PosAlign.right)),
+        PosColumn(
+            text: '\$9.00',
+            width: 3,
+            styles: const PosStyles(bold: true, align: PosAlign.right)),
       ]);
 
       printer.emptyLines(2);
@@ -153,7 +178,7 @@ class _SimpleNetworkPrinterExampleState extends State<SimpleNetworkPrinterExampl
 
     try {
       printer.reset();
-      
+
       printer.text(
         'Hello from Network Printer!',
         styles: const PosStyles(
@@ -161,7 +186,7 @@ class _SimpleNetworkPrinterExampleState extends State<SimpleNetworkPrinterExampl
           align: PosAlign.center,
         ),
       );
-      
+
       printer.emptyLines(1);
       printer.text('This is a simple text print test.');
       printer.emptyLines(2);
@@ -197,14 +222,18 @@ class _SimpleNetworkPrinterExampleState extends State<SimpleNetworkPrinterExampl
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isConnected ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                color: isConnected
+                    ? Colors.green.withOpacity(0.2)
+                    : Colors.grey.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 'Status: $statusMessage',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: isConnected ? Colors.green.shade800 : Colors.grey.shade700,
+                  color: isConnected
+                      ? Colors.green.shade800
+                      : Colors.grey.shade700,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -295,11 +324,13 @@ class _SimpleNetworkPrinterExampleState extends State<SimpleNetworkPrinterExampl
                       children: [
                         Text(
                           'Instructions:',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         SizedBox(height: 8),
                         Text('1. Enter your network printer\'s IP address'),
-                        Text('2. Enter the port (usually 9100 for ESC/POS printers)'),
+                        Text(
+                            '2. Enter the port (usually 9100 for ESC/POS printers)'),
                         Text('3. Tap "Connect" to establish connection'),
                         Text('4. Use the print buttons to test printing'),
                         Text('5. Tap "Disconnect" when finished'),
@@ -308,7 +339,8 @@ class _SimpleNetworkPrinterExampleState extends State<SimpleNetworkPrinterExampl
                           'Note:',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        Text('Make sure your printer supports ESC/POS commands and is connected to the same network.'),
+                        Text(
+                            'Make sure your printer supports ESC/POS commands and is connected to the same network.'),
                       ],
                     ),
                   ),
