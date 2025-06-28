@@ -1,6 +1,10 @@
 import 'dart:typed_data';
 import 'aterni_usb_eth_printing_platform_interface.dart';
 
+// Export network printer classes for external use
+export 'network_printer/network_printer.dart';
+export 'network_printer/enums.dart';
+
 class AterniUsbEthPrinting {
   Future<String?> getPlatformVersion() {
     return AterniUsbEthPrintingPlatform.instance.getPlatformVersion();
